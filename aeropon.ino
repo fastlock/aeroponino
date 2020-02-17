@@ -18,20 +18,22 @@
   Author:Fastlock
   Board:Arduino/Genuino Uno
 ****************************
-
+TO DO:
+  1.aggiungere un interfaccia seriale
+  2.rendere possibile modificare i parametri della macchina a stati
  */
 
 //--------------HARDWARE PARAMETERS-----------------------
-#define HP_WP_A_PIN 12
-#define HP_WP_B_PIN 11
-#define DEVIATOR_PIN 10
-#define AGITATOR_PIN 9
-#define TOP_TANK_PIN 8
-#define BOTTOM_TANK_PIN 2
+#define HP_WP_A_PIN 12 //Pompa alta pressione A
+#define HP_WP_B_PIN 11 //Pompa alta pressione B
+#define DEVIATOR_PIN 10 //Relè elettrovalvola deviatore
+#define AGITATOR_PIN 9 //Pompa agitatrice
+#define TOP_TANK_PIN 8 //Sensore livello alto tanica
+#define BOTTOM_TANK_PIN 2 //Sensore livello basso tanica
 //--------------STATE MACHINE PARAMETERS-------------------
-#define IDLE_CYCLE_LIMIT 2
-#define DELAY_IRRIGATION  10 //utes
-#define IRRIGATION_DURATION 5//seconds
+#define IDLE_CYCLE_LIMIT 2    //dopo quanti cicli avviare agitatore
+#define DELAY_IRRIGATION  10  //Tempo di attesa tra le irrigazioni (secondi)
+#define IRRIGATION_DURATION 5 //Tempo di irrigazione(secondi)
 volatile int General_state=0;
 bool is_night=false;
 volatile bool pump_sel;//0->A,1->B
@@ -40,9 +42,9 @@ bool tank_full=true;
 int pumps[2]={HP_WP_A_PIN,HP_WP_B_PIN};
 bool recirc_state=false;
 long int current=0;
-//---------------------------------------------------------
 long int t_start,t_stop;
 bool timer_armed=false;
+//---------------------------------------------------------
 void Set_timer1(uint16_t seconds)
 {
     timer_armed=true;
@@ -52,7 +54,7 @@ void Set_timer1(uint16_t seconds)
 void watchtime(){
   current=millis();
   if((current>=t_stop)&&timer_armed){
-    timeout();
+      timeout();//si è verificato un match.
   }
 }
 void timeout ()
@@ -112,10 +114,10 @@ void idle(){
   idle_cycle_count++;
   if(idle_cycle_count >= IDLE_CYCLE_LIMIT){
     idle_cycle_count=0;
-    recirculation(!recirc_state);//avvio il ricircolo un ciclo si e uno no
+    recirculation(!recirc_state);//avvio il ricircolo ogni due cicli
   }
-  daywatch();
-  Set_timer1(DELAY_IRRIGATION);//aspetto 2 min
+  daywatch();//controllo se è giorno
+  Set_timer1(DELAY_IRRIGATION);//imposto il timer di idle
 }
 void watering(){
   General_state=1;
@@ -162,6 +164,7 @@ void setup(){
 
 void loop(){
   watchtime();//controllo l'orologio
+  
 }
 void fill(){
   //registro lo stato precendente all'interrupt
