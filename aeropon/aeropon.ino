@@ -29,14 +29,22 @@ TO DO:
 #define DEVIATOR_PIN 10 //Relè elettrovalvola deviatore
 #define AGITATOR_PIN 9 //Pompa agitatrice
 #define TOP_TANK_PIN 8 //Sensore livello alto tanica
-#define BOTTOM_TANK_PIN 2 //Sensore livello basso tanica
+#define BOTTOM_TANK_PIN 7 //Sensore livello basso tanica
+#define LIGHT_SENSOR A0  //Sensore luminosità
+
+#define LOW 1
+#define HIGH 0
 //--------------STATE MACHINE PARAMETERS-------------------
-#define IDLE_CYCLE_LIMIT 2    //dopo quanti cicli avviare agitatore
-#define DELAY_IRRIGATION  10  //Tempo di attesa tra le irrigazioni (secondi)
-#define IRRIGATION_DURATION 5 //Tempo di irrigazione(secondi)
+int DAYLIGHT = 800;          //soglia luce sistema notte/giorno
+int IDLE_CYCLE_LIMIT = 2;    //dopo quanti cicli avviare agitatore
+int DELAY_IRRIGATION = 10;  //Tempo di attesa tra le irrigazioni (secondi)
+int IRRIGATION_DURATION= 5; //Tempo di irrigazione(secondi)
 volatile int General_state=0;
 bool is_night=false;
-volatile bool pump_sel;//0->A,1->B
+volatile bool pump_sel;//0->A,1->
+volatile bool stato_a;
+volatile bool stato_b;
+
 int idle_cycle_count=0;
 bool tank_full=true;
 int pumps[2]={HP_WP_A_PIN,HP_WP_B_PIN};
@@ -44,6 +52,7 @@ bool recirc_state=false;
 long int current=0;
 long int t_start,t_stop;
 bool timer_armed=false;
+
 //---------------------------------------------------------
 void Set_timer1(uint16_t seconds)
 {
@@ -81,17 +90,21 @@ void alt(int sel){
   if(sel==1){
      digitalWrite(HP_WP_B_PIN,LOW);
      digitalWrite(HP_WP_A_PIN,LOW);
+     stato_a=false;
+     stato_b=false;
   }
   else{
     digitalWrite(HP_WP_B_PIN,LOW);
     digitalWrite(HP_WP_A_PIN,LOW);
+    stato_a=false;
+    stato_b=false;
     digitalWrite(AGITATOR_PIN,LOW);
     digitalWrite(DEVIATOR_PIN,LOW);
   }
 }
 bool is_full(){
   //controlla se il serbatoio è pieno
-  if(digitalRead(TOP_TANK_PIN)==HIGH){
+  if(digitalRead(TOP_TANK_PIN)==LOW){
      tank_full=true;
      return true;
   }
@@ -102,11 +115,15 @@ bool is_full(){
   
 }
 bool daywatch(){
-  if(is_night){
-    sleep();
+  int light=analogRead(LIGHT_SENSOR);
+  //Serial.println(light);
+  if(light>=DAYLIGHT) {
+    is_night = true;
   }
-  else
-  return false;
+  else{
+    is_night=false;
+  }
+  
 }
 void idle(){ 
   General_state=0;
@@ -117,6 +134,11 @@ void idle(){
     recirculation(!recirc_state);//avvio il ricircolo ogni due cicli
   }
   daywatch();//controllo se è giorno
+  
+  if(is_night){
+    sleep();
+    
+  }
   Set_timer1(DELAY_IRRIGATION);//imposto il timer di idle
 }
 void watering(){
@@ -131,8 +153,13 @@ void sleep(){
   General_state=2;
   alt(0);//fermo tutto
   while(1){
-  if(daywatch()){
+  if(is_night){
+    
     idle();
+    
+  }
+  else{
+    return;
   }
   }
   
@@ -158,19 +185,34 @@ void setup(){
   pinMode(TOP_TANK_PIN,INPUT);
   pinMode(BOTTOM_TANK_PIN,INPUT);
   idle();
-  attachInterrupt(0, fill,FALLING);
+  //attachInterrupt(0, fill,FALLING);
+  //DEBUG
+  Serial.begin(9600);
+  Serial.println("AEROPONINO--WATER CONTROLLER SERIAL CONSOLE V.0.1");
   
 }
-
+void is_empty(){
+  if(digitalRead(BOTTOM_TANK_PIN)==HIGH){
+    Serial.println("Serbatoio vuoto");
+    fill();
+  }
+  else{
+    return;
+  }
+}
 void loop(){
   watchtime();//controllo l'orologio
+  is_empty();
+  Serial.print("CURRENT STATUS:");
+  Serial.println(General_state);
+  
   
 }
 void fill(){
   //registro lo stato precendente all'interrupt
   int past_state=General_state;
-  int stat_a=digitalRead(HP_WP_A_PIN);
-  int stat_b=digitalRead(HP_WP_B_PIN);
+  int stat_a=stato_a;
+  int stat_b=stato_b;
   alt(0);//fermo tutto
   General_state=3;
   while(!is_full()){
