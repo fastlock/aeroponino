@@ -34,7 +34,7 @@ TO DO:
 
 #define LOW 1
 #define HIGH 0
-//--------------STATE MACHINE PARAMETERS-------------------
+//-------------- DEFAULT STATE MACHINE PARAMETERS-------------------
 int DAYLIGHT = 800;          //soglia luce sistema notte/giorno
 int IDLE_CYCLE_LIMIT = 2;    //dopo quanti cicli avviare agitatore
 int DELAY_IRRIGATION = 10;  //Tempo di attesa tra le irrigazioni (secondi)
