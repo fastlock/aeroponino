@@ -35,7 +35,7 @@ TO DO:
 #define LOW 1
 #define HIGH 0
 //-------------- DEFAULT STATE MACHINE PARAMETERS-------------------
-int DAYLIGHT = 800;          //soglia luce sistema notte/giorno
+int DAYLIGHT = 150;          //soglia luce sistema notte/giorno
 int IDLE_CYCLE_LIMIT = 2;    //dopo quanti cicli avviare agitatore
 int DELAY_IRRIGATION = 10;  //Tempo di attesa tra le irrigazioni (secondi)
 int IRRIGATION_DURATION= 5; //Tempo di irrigazione(secondi)
@@ -104,7 +104,7 @@ void alt(int sel){
 }
 bool is_full(){
   //controlla se il serbatoio è pieno
-  if(digitalRead(TOP_TANK_PIN)==LOW){
+  if(digitalRead(TOP_TANK_PIN)==LOW){ 
      tank_full=true;
      return true;
   }
@@ -116,8 +116,10 @@ bool is_full(){
 }
 bool daywatch(){
   int light=analogRead(LIGHT_SENSOR);
+  Serial.print("VALORE LUCE");
+  Serial.println("Serbatoio vuoto");
   //Serial.println(light);
-  if(light>=DAYLIGHT) {
+  if(light<=DAYLIGHT) {
     is_night = true;
   }
   else{
@@ -129,13 +131,14 @@ void idle(){
   General_state=0;
   alt(1);//fermo le pompe
   idle_cycle_count++;
-  if(idle_cycle_count >= IDLE_CYCLE_LIMIT){
+  if((idle_cycle_count >= IDLE_CYCLE_LIMIT)&&(!is_night)){
     idle_cycle_count=0;
     recirculation(!recirc_state);//avvio il ricircolo ogni due cicli
   }
   daywatch();//controllo se è giorno
   
   if(is_night){
+    Serial.println("È NOTTE");
     sleep();
     
   }
@@ -192,7 +195,7 @@ void setup(){
   
 }
 void is_empty(){
-  if(digitalRead(BOTTOM_TANK_PIN)==HIGH){
+  if(digitalRead(BOTTOM_TANK_PIN)==HIGH){//LOGICA INVERSA
     Serial.println("Serbatoio vuoto");
     fill();
   }
@@ -222,7 +225,7 @@ void fill(){
   alt(0);
   //ristabilisco lo stato dopo l'esecuzione dell'interrupt
   General_state=past_state;
-  digitalWrite(HP_WP_A_PIN,stat_a);
-  digitalWrite(HP_WP_B_PIN,stat_b);
+  //digitalWrite(HP_WP_A_PIN,!stat_a);
+  //digitalWrite(HP_WP_B_PIN,!stat_b);
 }
 
