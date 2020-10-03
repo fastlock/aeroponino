@@ -18,11 +18,10 @@
   Author:Fastlock
   Board:Arduino/Genuino Uno
 ****************************
-TO DO:
-  1.aggiungere un interfaccia seriale
-  2.rendere possibile modificare i parametri della macchina a stati
- */
 
+REV 3/10/2020
+ */
+#include <EEPROM.h>
 //--------------HARDWARE PARAMETERS-----------------------
 #define HP_WP_A_PIN 12 //Pompa alta pressione A
 #define HP_WP_B_PIN 11 //Pompa alta pressione B
@@ -32,8 +31,10 @@ TO DO:
 #define BOTTOM_TANK_PIN 7 //Sensore livello basso tanica
 #define LIGHT_SENSOR A0  //Sensore luminosità
 
-#define LOW 1
-#define HIGH 0
+#define LOW 0
+#define HIGH 1
+#define low_sens 0
+#define high_sens 1
 //-------------- DEFAULT STATE MACHINE PARAMETERS-------------------
 int DAYLIGHT = 150;          //soglia luce sistema notte/giorno
 int IDLE_CYCLE_LIMIT = 2;    //dopo quanti cicli avviare agitatore
@@ -52,7 +53,9 @@ bool recirc_state=false;
 long int current=0;
 long int t_start,t_stop;
 bool timer_armed=false;
-
+int light_val_address=2;
+int delay_val_address=6;
+int duration_val_address=10;
 //---------------------------------------------------------
 void Set_timer1(uint16_t seconds)
 {
@@ -61,6 +64,12 @@ void Set_timer1(uint16_t seconds)
     t_stop=millis()+(seconds*1000);
 }
 void watchtime(){
+  //controllo se è giorno ogni ciclo di loop
+  daywatch();
+  if(is_night){
+    sleep();
+    return;
+  }
   current=millis();
   if((current>=t_stop)&&timer_armed){
       timeout();//si è verificato un match.
@@ -104,7 +113,7 @@ void alt(int sel){
 }
 bool is_full(){
   //controlla se il serbatoio è pieno
-  if(digitalRead(TOP_TANK_PIN)==LOW){ 
+  if(digitalRead(TOP_TANK_PIN)==high_sens){ 
      tank_full=true;
      return true;
   }
@@ -116,8 +125,8 @@ bool is_full(){
 }
 bool daywatch(){
   int light=analogRead(LIGHT_SENSOR);
-  Serial.print("VALORE LUCE");
-  Serial.println("Serbatoio vuoto");
+  //Serial.print("VALORE LUCE");
+  //Serial.println("Serbatoio vuoto");
   //Serial.println(light);
   if(light<=DAYLIGHT) {
     is_night = true;
@@ -135,13 +144,14 @@ void idle(){
     idle_cycle_count=0;
     recirculation(!recirc_state);//avvio il ricircolo ogni due cicli
   }
-  daywatch();//controllo se è giorno
+  //daywatch();//controllo se è giorno
   
-  if(is_night){
+  /*if(is_night){
     Serial.println("È NOTTE");
     sleep();
     
   }
+  */
   Set_timer1(DELAY_IRRIGATION);//imposto il timer di idle
 }
 void watering(){
@@ -153,18 +163,9 @@ void watering(){
   
 }
 void sleep(){
-  General_state=2;
   alt(0);//fermo tutto
-  while(1){
-  if(is_night){
-    
-    idle();
-    
-  }
-  else{
-    return;
-  }
-  }
+  Serial.println("Notte");
+  //delay(1000);
   
 }
 
@@ -178,6 +179,7 @@ void recirculation(bool state){
     digitalWrite(AGITATOR_PIN,LOW);
   }
   recirc_state=state;
+  
 }
 
 void setup(){
@@ -187,15 +189,18 @@ void setup(){
   pinMode(DEVIATOR_PIN,OUTPUT);
   pinMode(TOP_TANK_PIN,INPUT);
   pinMode(BOTTOM_TANK_PIN,INPUT);
+  if(EEPROM.read(light_val_address) !=0) DAYLIGHT=EEPROM.read(light_val_address);
+  if(EEPROM.read(delay_val_address) !=0) DELAY_IRRIGATION=EEPROM.read(delay_val_address);
+  if(EEPROM.read(duration_val_address) !=0) IRRIGATION_DURATION=EEPROM.read(duration_val_address);
   idle();
-  //attachInterrupt(0, fill,FALLING);
-  //DEBUG
+
   Serial.begin(9600);
   Serial.println("AEROPONINO--WATER CONTROLLER SERIAL CONSOLE V.0.1");
   
 }
 void is_empty(){
-  if(digitalRead(BOTTOM_TANK_PIN)==HIGH){//LOGICA INVERSA
+  //riempio il serbatoio se è vuoto solo di giorno
+  if((digitalRead(BOTTOM_TANK_PIN)==low_sens) && !is_night){//LOGICA INVERSA
     Serial.println("Serbatoio vuoto");
     fill();
   }
@@ -208,6 +213,7 @@ void loop(){
   is_empty();
   Serial.print("CURRENT STATUS:");
   Serial.println(General_state);
+  serialCOMM();
   
   
 }
@@ -227,5 +233,75 @@ void fill(){
   General_state=past_state;
   //digitalWrite(HP_WP_A_PIN,!stat_a);
   //digitalWrite(HP_WP_B_PIN,!stat_b);
+}
+void serialCOMM(){
+  int irr,idles,sday;
+  sday=DAYLIGHT;
+  idles=DELAY_IRRIGATION;
+  irr=IRRIGATION_DURATION;
+  if(Serial.available()){
+    alt(0);
+   if(Serial.read()=='c'){
+     Serial.println("1.modifica soglia luce\n2.modifica tempo idle\n3.modifica tempo irrigazione\n4.mostra soglie\n5.valori real time \n6.salva ed esci");
+    for(;;){
+      
+      switch(Serial.read()){
+        case '1':
+        Serial.println("luce");
+        delay(1000);
+        sday=Serial.readString().toInt();
+        Serial.println(sday);
+        delay(1000);
+        break;
+        case '2':
+        Serial.println("idle");
+        delay(1000);
+        idles=Serial.readString().toInt();
+        Serial.println(idles);
+        delay(1000);
+        break;
+        case '3':
+        Serial.println("irr");
+        delay(1000);
+        irr=Serial.readString().toInt();
+        Serial.println(irr);
+        delay(1000);
+        break;
+        case '4': 
+        Serial.println("----soglie salvate----");
+        Serial.print("Soglia Giorno:");
+        Serial.println(DAYLIGHT);
+        Serial.print("Tempo di pausa(s):");
+        Serial.println(DELAY_IRRIGATION);
+        Serial.print("Tempo di Irrigazione(s):");
+        Serial.println(IRRIGATION_DURATION);
+        break;
+        case '5':
+        Serial.println("----ultima lettura----");
+        Serial.print("LUCE ATTUALE:");
+        Serial.println(analogRead(LIGHT_SENSOR));
+        Serial.print("valore eeprom:");
+        Serial.println(EEPROM.read(light_val_address));
+        break;
+        case '6':
+        Serial.println("SALVATAGGIO");
+        DAYLIGHT=sday;
+        DELAY_IRRIGATION=idles;
+        IRRIGATION_DURATION=irr;
+        EEPROM.put(light_val_address,sday);
+        EEPROM.put(delay_val_address,idles);
+        EEPROM.put(duration_val_address,irr);
+        delay(3000);
+        Serial.println("SALVATAGGIO COMPLETATO");
+        delay(1000);
+
+        return;
+        default:continue;
+      }
+    
+    }
+    
+   }
+  }
 }
 
