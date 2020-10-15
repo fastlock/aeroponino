@@ -21,7 +21,7 @@
 
 REV 3/10/2020
  */
-#include <EEPROM.h>
+//#include <EEPROM.h>//futuro
 //--------------HARDWARE PARAMETERS-----------------------
 #define HP_WP_A_PIN 12 //Pompa alta pressione A
 #define HP_WP_B_PIN 11 //Pompa alta pressione B
@@ -189,9 +189,9 @@ void setup(){
   pinMode(DEVIATOR_PIN,OUTPUT);
   pinMode(TOP_TANK_PIN,INPUT);
   pinMode(BOTTOM_TANK_PIN,INPUT);
-  if(EEPROM.read(light_val_address) !=0) DAYLIGHT=EEPROM.read(light_val_address);
-  if(EEPROM.read(delay_val_address) !=0) DELAY_IRRIGATION=EEPROM.read(delay_val_address);
-  if(EEPROM.read(duration_val_address) !=0) IRRIGATION_DURATION=EEPROM.read(duration_val_address);
+  //if(EEPROM.read(light_val_address) !=0) DAYLIGHT=EEPROM.read(light_val_address);
+  //if(EEPROM.read(delay_val_address) !=0) DELAY_IRRIGATION=EEPROM.read(delay_val_address);
+  //if(EEPROM.read(duration_val_address) !=0) IRRIGATION_DURATION=EEPROM.read(duration_val_address);
   idle();
 
   Serial.begin(9600);
@@ -213,7 +213,7 @@ void loop(){
   is_empty();
   Serial.print("CURRENT STATUS:");
   Serial.println(General_state);
-  serialCOMM();
+  //serialCOMM();futuro
   
   
 }
@@ -234,6 +234,8 @@ void fill(){
   //digitalWrite(HP_WP_A_PIN,!stat_a);
   //digitalWrite(HP_WP_B_PIN,!stat_b);
 }
+/*
+//futuro
 void serialCOMM(){
   int irr,idles,sday;
   sday=DAYLIGHT;
@@ -304,4 +306,5 @@ void serialCOMM(){
    }
   }
 }
+*/
 
